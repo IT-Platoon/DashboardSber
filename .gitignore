@@ -24,7 +24,6 @@ segmentation_model
 *.png
 labels/
 *.cache
-*.csv
 
 .DS_Store
 node_modules

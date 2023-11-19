@@ -80,7 +80,6 @@ def load_file(
 
 
 def plot_increasing(
-    st,
     df: pd.DataFrame,
     feature: str,
     series: list,
@@ -104,19 +103,16 @@ def plot_increasing(
     if 'клиент' in feature:
         df[series].sum().plot(ax=ax)
         ax.set_title(f"Рост пользователей {name} за все периоды", {'fontsize': 18})
-        st.subheader(f"Рост пользователей {name} за все периоды")
     else:
         new_df = df.groupby(feature)[series].sum().transpose()
         new_df.plot(ax=ax)
         ax.set_title(f"Рост пользователей {name} за все периоды по {feature}", {'fontsize': 18})
-        st.subheader(f"Рост пользователей {name} за все периоды по {feature}")
         ax.set_ylabel("Кол-во клиентов за период", {'fontsize': 18})
     # fig.savefig(f'{feature}.png')
     return fig
 
 
 def plot_box(
-    st,
     df: pd.DataFrame,
 ) -> None:
     """
@@ -127,7 +123,6 @@ def plot_box(
     """
     fig, ax = plt.subplots(1, 1, figsize=(15, 15))
     fontsize = 18
-    st.subheader('Ящик с усами распределения клиентов')
     plt.title('Ящик с усами распределения клиентов', fontsize=fontsize)
     ax.tick_params(labelsize=fontsize)
     sns.boxplot(
@@ -179,13 +174,12 @@ def plot_chart(
     return fig
 
 
-def plot_charTS(st, seria: pd.Series):
+def plot_charTS(seria: pd.Series):
     """
 
     :param seria:
     :return:
     """
-    st.subheader('Сезонная декомпозиция')
     fig, ax = plt.subplots(1, 1, figsize=(20, 28))
     decompose = seasonal_decompose(seria)
     plt.title('Сезонная декомпозиция')

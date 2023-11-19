@@ -1,3 +1,5 @@
+import json
+
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -11,15 +13,15 @@ from graphics import load_file, plot_increasing, plot_box, plot_charTS
 from ml.model import ModelProphet
 
 
-st.set_page_config(page_title="Dashboard Sber")
-st.title('Dashboard Sber')
+st.set_page_config(page_title="Дашборд Сбер")
+st.title('Дашборд Сбер')
 st.session_state["files"] = {
    "df_general_profile": {"file_id": "", "df": None},
-   "df_general_dashboard": {"file_id": "", "df": None},
+   "df_general_dashboard": {"df": None},
    "df_acquiring_dashboard": {"file_id": "", "df": None},
 }
 
-tab1, tab2, tab3 = st.tabs(["Dashboard", "Prediction", "Profiles"])
+tab1, tab2, tab3 = st.tabs(["Дашборд", "Предсказание", "Профили"])
 
 with tab1:
    st.title("Построение дашбордов")
@@ -30,9 +32,7 @@ with tab1:
 
    df_acquiring, df_general = None, None
    
-   if (
-      uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb")
-   ):
+   if uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb"):
       if (
          st.session_state["files"]['df_general_dashboard']["file_id"] != uploaded_file_acquiring_dashboard.file_id or
          st.session_state["files"]['df_general_dashboard']["df"] is None
@@ -45,6 +45,7 @@ with tab1:
          my_bar.empty()
          st.session_state["files"]['df_general_dashboard']["df"] = df_general
          st.session_state["files"]['df_acquiring_dashboard']["df"] = df_acquiring
+         st.session_state["files"]['df_acquiring_dashboard']["file_id"] = uploaded_file_acquiring_dashboard.file_id
       else:
          df_general = st.session_state["files"]['df_general_dashboard']["df"]
          df_acquiring = st.session_state["files"]['df_acquiring_dashboard']["df"]
@@ -63,7 +64,6 @@ with tab1:
       for col in tmp_cols:
 
          fig = plot_increasing(
-            st,
             df=df_acquiring_merged,
             feature=col,
             series=series_cols,
@@ -72,10 +72,11 @@ with tab1:
          st.pyplot(fig)
 
 
-      fig = plot_box(st, data)
+      fig = plot_box(data)
       st.pyplot(fig)
 
-      fig = plot_charTS(st, data["y"])
+      st.subheader("Сезонная декомпозиция")
+      fig = plot_charTS(data["y"])
       st.pyplot(fig)
 
 with tab2:
@@ -115,26 +116,27 @@ with tab2:
          if task is not None and product is not None:
             if task == tasks_predict[0]:
                if product == products[0]:
-                  model = ModelProphet('model_growth_clients_eq.pkl', floor=304, cap=47000)
+                  model = ModelProphet('model_growth_clients_eq.pkl', 'data_growth_clients_eq.csv', floor=304, cap=47000)
                elif product == products[1]:
-                  model = ModelProphet('model_growth_clients_rko.pkl', floor=304, cap=47000)
+                  model = ModelProphet('model_growth_clients_rko.pkl', 'data_growth_clients_rko.csv', floor=304, cap=47000)
             elif task == tasks_predict[1]:
                if product == products[0]:
-                  model = ModelProphet('model_cr_eq.pkl', floor=0, cap=100)
+                  model = ModelProphet('model_cr_eq.pkl', 'data_cr_eq.csv', floor=0, cap=100)
                elif product == products[1]:
-                  model = ModelProphet('model_cr_rko.pkl', floor=0, cap=100)
+                  model = ModelProphet('model_cr_rko.pkl', 'data_cr_rko.csv', floor=0, cap=100)
             elif task == tasks_predict[2]:
                if product == products[0]:
-                  model = ModelProphet('model_pr_eq.pkl', floor=0, cap=100)
+                  model = ModelProphet('model_pr_eq.pkl', 'data_pr_eq.csv', floor=0, cap=100)
                elif product == products[1]:
-                  model = ModelProphet('model_pr_rko.pkl', floor=0, cap=100)
+                  model = ModelProphet('model_pr_rko.pkl', 'data_pr_rko.csv', floor=0, cap=100)
             
             pred = model.predict(date.year, date.month, date.day)
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.set_title(f'Тестирование модели для {product}')
             ax.set_xlabel("Период")
             ax.set_ylabel(task)
-            ax.plot(pred.ds, pred.yhat, "r", label="prediction", linewidth=2.0)
+            ax.plot(pred.ds, pred.y, "r", label="prediction", linewidth=2.0)
+            plt.xticks(rotation=30)
             st.pyplot(fig)
 
 with tab3:
@@ -147,15 +149,14 @@ with tab3:
    
    df_general = None
   
-   if (
-      uploaded_file_general_profile and uploaded_file_general_profile.name.endswith(".xlsb")
-   ):
+   if uploaded_file_general_profile and uploaded_file_general_profile.name.endswith(".xlsb"):
       if st.session_state["files"]['df_general_profile']["file_id"] != uploaded_file_general_profile.file_id:
          my_bar = st.progress(0, text="Обработка главного файла")
          df_general = load_file(file_path=uploaded_file_general_profile.getvalue(), header=0)
          my_bar.progress(100, text="Обработка файлов")
          my_bar.empty()
          st.session_state["files"]['df_general_profile']["df"] = df_general
+         st.session_state["files"]['df_general_profile']["file_id"] = uploaded_file_general_profile.file_id
       else:
          df_general = st.session_state["files"]['df_general_profile']["df"]
 
@@ -237,29 +238,46 @@ with tab3:
       qd_df = (all_mean - reg_correct.mean()) ** 2
       qd_df['group'] = all_mean['group']
       max_df = qd_df.max()
+      
+      round_df = max_df.round()
+
       dict_feat = {}
       for col in all_mean.columns:
-         dict_feat[col] = list(qd_df[qd_df[col] == max_df[col]]['group'])
-      round_df = max_df.round()
+         dict_feat[col] = list(qd_df[qd_df[col] == max_df[col]]['group'].astype('int'))
 
       groups_feats = {}
       for lbl, groups in dict_feat.items():
          for group in groups:
+            if lbl == 'group':
+                  continue
             if group in groups_feats:
                   groups_feats[group].append(lbl)
             else:
                   groups_feats[group] = [lbl]
-      print(groups_feats)
 
       def show_graphic_2d(data, labels):
-         fig, axs = plt.subplots(1, 1, figsize=(9, 9))
-         axs.scatter(data[:, 0], data[:, 1], c=labels, s=2)
+         fig, ax = plt.subplots(1, 1, figsize=(9, 9))
+         ax.tick_params(
+            left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+         )
+         scatter = ax.scatter(data[:, 0], data[:, 1], c=labels, s=2, label=labels)
+         legend = ax.legend(
+            *scatter.legend_elements(), loc="best", title="Профиль"
+         )
+         ax.add_artist(legend)
          return fig
 
       def show_graphic_3d(data, labels):
          fig = plt.figure(figsize=(9, 9))
-         axs = fig.add_subplot(projection='3d')
-         axs.scatter(data[:, 0], data[:, 1], data[:, 2], c=labels, s=1)
+         ax = fig.add_subplot(projection='3d')
+         scatter = ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=labels, s=1)
+         ax.tick_params(
+            left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+         )
+         legend = ax.legend(
+            *scatter.legend_elements(), loc="best", title="Профиль"
+         )
+         ax.add_artist(legend)
          return fig
 
       with st.form(key="form_profile"):
@@ -270,7 +288,7 @@ with tab3:
          )
          submit_button = st.form_submit_button(label="Отрисовать", type="primary")
 
-         if submit_button:
+         if submit_button and profile is not None:
             embedded_pca = PCA(n_components=2).fit_transform(scaled) # точки для 2d
             embedded_pca_3d = PCA(n_components=3).fit_transform(scaled) # точки для 3d
             # bkm.labels_ - цвета для точек
@@ -286,4 +304,24 @@ with tab3:
                   selected_feats[lbl] = coders[lbl].inverse_transform([int(value)])[0]
                except:
                   pass
-            print(selected_feats)
+
+            with open ('labels.json', 'r', encoding='utf-8') as file:
+               labels_dict = json.loads(file.read())
+
+            texts = {}
+            for group in range(10):
+               if group in groups_feats:
+                  chars = set()
+                  for feat in groups_feats[group][:4]:
+                        value = selected_feats.get(feat, '')
+                        if value in labels_dict and feat in labels_dict[value]:
+                           chars.add(labels_dict[value][feat])
+                        else:
+                           chars.add(f'{feat}: {value}')
+                  texts[group] = ', '.join(chars)
+               else:
+                  texts[group] = 'Среднестатистический пользователь'
+            
+            st.subheader("Характеристика пользователя")
+
+            st.write(texts[profile].capitalize())

@@ -23,19 +23,23 @@ class ModelProphet:
     def __init__(
             self,
             model: Union[str, Prophet],
+            old_date: Union[pd.DataFrame, str],
             cap: Optional[float] = None,
             floor: Optional[float] = None,
-            start_date: date = date(2021, 11, 30),
     ):
         if isinstance(model, Prophet):
             self.model = model
         elif isinstance(model, str):
             self.model = self.load(model)
 
+        if isinstance(old_date, pd.DataFrame):
+            self.old_date = old_date
+        elif isinstance(old_date, str):
+            old_date = CUR_PATH + '/data/' + old_date
+            self.old_date = pd.read_csv(old_date)
+
         self.cap = cap
         self.floor = floor
-
-        self.start_date = start_date
 
     def save(self) -> None:
         """Сохранение модели."""
@@ -62,29 +66,42 @@ class ModelProphet:
         end_date = date(year, month, day)
 
         # Сразу добавляем стартовую дату
-        periods = [self.start_date]
+        date_last_list = self.old_date.ds.iloc[-1].split('-')
+        date_last = date(int(date_last_list[0]), int(date_last_list[1]), int(date_last_list[2]))
+        periods = [date_last + relativedelta(months=1)]
 
-        new_date = self.start_date
+        new_date = periods[0]
         while new_date < end_date:
             new_date += relativedelta(months=1) 
             periods.append(new_date)
+        print(date_last)
+        print(periods)
 
         if end_date not in periods:
             periods.append(end_date)
 
-        data = pd.DataFrame({'ds': periods})
-
+        data_for_pred = pd.DataFrame({'ds': periods})
         if self.floor is not None:
-            data['floor'] = self.floor
+            data_for_pred['floor'] = self.floor
         if self.cap is not None:
-            data['cap'] = self.cap
+            data_for_pred['cap'] = self.cap
 
-        pred = self.model.predict(data)
-        pred.index = data.index
-        return pred[['ds', 'yhat']]
+        pred = self.model.predict(data_for_pred)
+        pred = pred[['ds', 'yhat']]
+        pred.columns = ['ds', 'y']
+
+        df_final = pd.concat([self.old_date, pred], ignore_index=True)
+        df_final.ds = df_final.ds.map(lambda x: x if isinstance(x, str ) else date.isoformat(x))
+        return df_final
 
 
 if __name__ == '__main__':
-    model = ModelProphet('model_growth_clients_rko.pkl', floor=0, cap=100)
+    model = ModelProphet(
+        'model_growth_clients_eq.pkl',
+        'data_growth_clients_eq.csv',
+
+        floor=159,
+        cap=8546
+    )
     print(model)
     print(model.predict(2024, 2, 27))
