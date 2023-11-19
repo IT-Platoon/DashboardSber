@@ -31,7 +31,6 @@ with tab1:
    )
 
    df_acquiring, df_general = None, None
-   st.cache
    if uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb"):
       if (
          st.session_state["files"]['df_general_dashboard']["file_id"] != uploaded_file_acquiring_dashboard.file_id or
@@ -141,6 +140,7 @@ with tab2:
 
             ax.set_ylabel(task)
             plt.xticks(rotation=30)
+            plt.legend(["Истинные данные", "Предсказанные данные"], loc ="lower right")
             st.pyplot(fig)
 
 with tab3:
