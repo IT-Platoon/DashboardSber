@@ -8,30 +8,46 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 import streamlit as st
 
 from graphics import load_file, plot_increasing, plot_box, plot_charTS
+from ml.model import ModelProphet
 
 
 st.set_page_config(page_title="Dashboard Sber")
 st.title('Dashboard Sber')
+st.session_state["files"] = {
+   "df_general_profile": {"file_id": "", "df": None},
+   "df_general_dashboard": {"file_id": "", "df": None},
+   "df_acquiring_dashboard": {"file_id": "", "df": None},
+}
 
 tab1, tab2, tab3 = st.tabs(["Dashboard", "Prediction", "Profiles"])
 
 with tab1:
    st.title("Построение дашбордов")
-   uploaded_file_acquiring = st.file_uploader(
+   uploaded_file_acquiring_dashboard = st.file_uploader(
       "Выберите файл эквайринга",
       key="dashboard_acquiring",
    )
+
    df_acquiring, df_general = None, None
-   if (
-      uploaded_file_acquiring and uploaded_file_acquiring.name.endswith(".xlsb")
-   ):
-      my_bar = st.progress(0, text="Обработка файла эквайринга")
-      df_acquiring = load_file(file_path=uploaded_file_acquiring.getvalue(), header=1, need_data_fix=True)
-      my_bar.progress(50, text="Обработка файла с основной информацией")
-      df_general = load_file(file_path='./src/dataset/general.xlsb', header=0)
-      my_bar.progress(100, text="Обработка файлов завершена")
-      my_bar.empty()
    
+   if (
+      uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb")
+   ):
+      if (
+         st.session_state["files"]['df_general_dashboard']["file_id"] != uploaded_file_acquiring_dashboard.file_id or
+         st.session_state["files"]['df_general_dashboard']["df"] is None
+      ):
+         my_bar = st.progress(0, text="Обработка файла эквайринга")
+         df_acquiring = load_file(file_path=uploaded_file_acquiring_dashboard.getvalue(), header=1, need_data_fix=True)
+         my_bar.progress(50, text="Обработка файла с основной информацией")
+         df_general = load_file(file_path='./src/dataset/general.xlsb', header=0)
+         my_bar.progress(100, text="Обработка файлов завершена")
+         my_bar.empty()
+         st.session_state["files"]['df_general_dashboard']["df"] = df_general
+         st.session_state["files"]['df_acquiring_dashboard']["df"] = df_acquiring
+      else:
+         df_general = st.session_state["files"]['df_general_dashboard']["df"]
+         df_acquiring = st.session_state["files"]['df_acquiring_dashboard']["df"]
 
    if df_acquiring is not None and df_general is not None:
 
@@ -70,28 +86,81 @@ with tab2:
       format="YYYY-MM-DD",
       label_visibility="visible",
    )
-   
+
+   model = None
+
+   with st.form(key="form_predict"):
+      tasks_predict = [
+         "Предсказание роста клиентов",
+         "Предсказание оттока клиентов",
+         "Предсказание выживаемости клиентов",
+      ]
+      task = st.selectbox(
+         ("Выберите задачу предсказания"),
+         tasks_predict,
+         index=None,
+         placeholder="Выберите задачу предсказания",
+      )
+
+      products = ["Эквайринг", "РКО"]
+      product = st.selectbox(
+         ("Выберите продукт предсказания"),
+         products,
+         index=None,
+         placeholder="Выберите продукт предсказания",
+      )
+      submit_button = st.form_submit_button(label="Предсказать", type="primary")
+
+      if submit_button:
+         if task is not None and product is not None:
+            if task == tasks_predict[0]:
+               if product == products[0]:
+                  model = ModelProphet('model_growth_clients_eq.pkl', floor=304, cap=47000)
+               elif product == products[1]:
+                  model = ModelProphet('model_growth_clients_rko.pkl', floor=304, cap=47000)
+            elif task == tasks_predict[1]:
+               if product == products[0]:
+                  model = ModelProphet('model_cr_eq.pkl', floor=0, cap=100)
+               elif product == products[1]:
+                  model = ModelProphet('model_cr_rko.pkl', floor=0, cap=100)
+            elif task == tasks_predict[2]:
+               if product == products[0]:
+                  model = ModelProphet('model_pr_eq.pkl', floor=0, cap=100)
+               elif product == products[1]:
+                  model = ModelProphet('model_pr_rko.pkl', floor=0, cap=100)
+            
+            pred = model.predict(date.year, date.month, date.day)
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.set_title(f'Тестирование модели для {product}')
+            ax.set_xlabel("Период")
+            ax.set_ylabel(task)
+            ax.plot(pred.ds, pred.yhat, "r", label="prediction", linewidth=2.0)
+            st.pyplot(fig)
 
 with tab3:
    st.title("Профили решений")
 
-   uploaded_file_general = st.file_uploader(
+   uploaded_file_general_profile = st.file_uploader(
       "Выберите файл с основной информацией",
       key="profile_general",
    )
-   df_general = None
-   if (
-      uploaded_file_general and uploaded_file_general.name.endswith(".xlsb")
-   ):
-      my_bar = st.progress(0, text="Обработка главного файла")
-      df_general = load_file(file_path=uploaded_file_general.getvalue(), header=0)
-      my_bar.progress(100, text="Обработка файлов")
-      my_bar.empty()
    
+   df_general = None
+  
+   if (
+      uploaded_file_general_profile and uploaded_file_general_profile.name.endswith(".xlsb")
+   ):
+      if st.session_state["files"]['df_general_profile']["file_id"] != uploaded_file_general_profile.file_id:
+         my_bar = st.progress(0, text="Обработка главного файла")
+         df_general = load_file(file_path=uploaded_file_general_profile.getvalue(), header=0)
+         my_bar.progress(100, text="Обработка файлов")
+         my_bar.empty()
+         st.session_state["files"]['df_general_profile']["df"] = df_general
+      else:
+         df_general = st.session_state["files"]['df_general_profile']["df"]
 
    if df_general is not None:
       cat_columns = df_general.select_dtypes(exclude=['int64', 'float64']).columns[1:]
-
       coders = {}
       def use_encoder(seria: pd.Series, name: str):
          seria = seria.astype('str')
@@ -193,30 +262,28 @@ with tab3:
          axs.scatter(data[:, 0], data[:, 1], data[:, 2], c=labels, s=1)
          return fig
 
-      def draw_graphic(*args, **kwargs):
-         print(*args)
-         print(**kwargs)
-         fig = show_graphic_2d(embedded_pca, bkm.labels_)
-         st.pyplot(fig)
-         fig = show_graphic_3d(embedded_pca_3d, bkm.labels_)
-         st.pyplot(fig)
+      with st.form(key="form_profile"):
+         profile = st.selectbox(
+            ("Выберите профиль"),
+            list(groups_feats.keys()),
+            placeholder="Выберите профиль",
+         )
+         submit_button = st.form_submit_button(label="Отрисовать", type="primary")
 
-      profile = st.selectbox(
-         ("Выберите профиль"),
-         list(groups_feats.keys()),
-         index=None,
-         placeholder="Выберите профиль",
-         on_change=draw_graphic,
-      )
+         if submit_button:
+            embedded_pca = PCA(n_components=2).fit_transform(scaled) # точки для 2d
+            embedded_pca_3d = PCA(n_components=3).fit_transform(scaled) # точки для 3d
+            # bkm.labels_ - цвета для точек
 
-      embedded_pca = PCA(n_components=2).fit_transform(scaled) # точки для 2d
-      embedded_pca_3d = PCA(n_components=3).fit_transform(scaled) # точки для 3d
-      # bkm.labels_ - цвета для точек
+            fig = show_graphic_2d(embedded_pca, bkm.labels_)
+            st.pyplot(fig)
+            fig = show_graphic_3d(embedded_pca_3d, bkm.labels_)
+            st.pyplot(fig)
 
-      selected_feats = {}
-      for lbl, value in zip(round_df.axes[0], round_df):
-         try:
-            selected_feats[lbl] = coders[lbl].inverse_transform([int(value)])[0]
-         except:
-            pass
-      print(selected_feats)
+            selected_feats = {}
+            for lbl, value in zip(round_df.axes[0], round_df):
+               try:
+                  selected_feats[lbl] = coders[lbl].inverse_transform([int(value)])[0]
+               except:
+                  pass
+            print(selected_feats)
