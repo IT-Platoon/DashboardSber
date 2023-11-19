@@ -68,19 +68,17 @@ class ModelProphet:
         # Сразу добавляем стартовую дату
         date_last_list = self.old_date.ds.iloc[-1].split('-')
         date_last = date(int(date_last_list[0]), int(date_last_list[1]), int(date_last_list[2]))
-        periods = [date_last + relativedelta(months=1)]
+        next_periods = [date_last + relativedelta(months=1)]
 
-        new_date = periods[0]
+        new_date = next_periods[0]
         while new_date < end_date:
             new_date += relativedelta(months=1) 
-            periods.append(new_date)
-        print(date_last)
-        print(periods)
+            next_periods.append(new_date)
 
-        if end_date not in periods:
-            periods.append(end_date)
+        if end_date not in next_periods:
+            next_periods.append(end_date)
 
-        data_for_pred = pd.DataFrame({'ds': periods})
+        data_for_pred = pd.DataFrame({'ds': next_periods})
         if self.floor is not None:
             data_for_pred['floor'] = self.floor
         if self.cap is not None:
@@ -91,16 +89,24 @@ class ModelProphet:
         pred.columns = ['ds', 'y']
 
         df_final = pd.concat([self.old_date, pred], ignore_index=True)
-        return df_final
+        return df_final, date_last
 
 
 if __name__ == '__main__':
     model = ModelProphet(
-        'model_growth_clients_eq.pkl',
-        'data_growth_clients_eq.csv',
+        'model_growth_clients_rko.pkl',
+        'data_growth_clients_rko.csv',
 
         floor=159,
         cap=8546
     )
-    print(model)
-    print(model.predict(2024, 2, 27))
+    df_final, date_last = model.predict(2024, 2, 27)
+
+    # fig, ax = plt.subplots()
+    # ax.set_title(f'Тестирование модели для {product}')
+    # ax.set_xlabel("Период")
+    # ax.set_ylabel(task)
+    # true = df_final.iloc[:model.old_date.shape[0]]
+    # ax.plot(true.ds, true.y, "g", label="true", linewidth=2.0)
+    # pred = df_final.iloc[model.old_date.shape[0]-1:]
+    # ax.plot(pred.ds, pred.yhat, "r", label="prediction", linewidth=2.0)
