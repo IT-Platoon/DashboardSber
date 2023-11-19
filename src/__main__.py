@@ -1,7 +1,5 @@
 import json
 
-import altair as alt
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import BisectingKMeans
@@ -15,11 +13,25 @@ from ml.model import ModelProphet
 
 st.set_page_config(page_title="Дашборд Сбер")
 st.title('Дашборд Сбер')
+print(st.session_state)
+st.session_state["active_page"] = 1
 st.session_state["files"] = {
-   "df_general_profile": {"file_id": "", "df": None},
-   "df_general_dashboard": {"df": None},
-   "df_acquiring_dashboard": {"file_id": "", "df": None},
+   "df_general_profile": None,
+   "df_general_dashboard": None,
+   "df_acquiring_dashboard": None,
 }
+
+def file_tab1():
+   st.session_state["active_page"] = 1
+
+
+def file_tab2():
+   st.session_state["active_page"] = 2
+
+
+def file_tab3():
+   st.session_state["active_page"] = 3
+
 
 tab1, tab2, tab3 = st.tabs(["Дашборд", "Предсказание", "Профили"])
 
@@ -28,13 +40,13 @@ with tab1:
    uploaded_file_acquiring_dashboard = st.file_uploader(
       "Выберите файл эквайринга",
       key="dashboard_acquiring",
+      on_change=file_tab1,
    )
-
    df_acquiring, df_general = None, None
    if uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb"):
       if (
-         st.session_state["files"]['df_general_dashboard']["file_id"] != uploaded_file_acquiring_dashboard.file_id or
-         st.session_state["files"]['df_general_dashboard']["df"] is None
+         st.session_state["dashboard_acquiring"].file_id != uploaded_file_acquiring_dashboard.file_id or
+         st.session_state["files"]['df_general_dashboard'] is None
       ):
          my_bar = st.progress(0, text="Обработка файла эквайринга")
          df_acquiring = load_file(file_path=uploaded_file_acquiring_dashboard.getvalue(), header=1, need_data_fix=True)
@@ -42,12 +54,11 @@ with tab1:
          df_general = load_file(file_path='./src/dataset/general.xlsb', header=0)
          my_bar.progress(100, text="Обработка файлов завершена")
          my_bar.empty()
-         st.session_state["files"]['df_general_dashboard']["df"] = df_general
-         st.session_state["files"]['df_acquiring_dashboard']["df"] = df_acquiring
-         st.session_state["files"]['df_acquiring_dashboard']["file_id"] = uploaded_file_acquiring_dashboard.file_id
+         st.session_state["files"]['df_general_dashboard'] = df_general
+         st.session_state["files"]['df_acquiring_dashboard'] = df_acquiring
       else:
-         df_general = st.session_state["files"]['df_general_dashboard']["df"]
-         df_acquiring = st.session_state["files"]['df_acquiring_dashboard']["df"]
+         df_general = st.session_state["files"]['df_general_dashboard']
+         df_acquiring = st.session_state["files"]['df_acquiring_dashboard']
 
    if df_acquiring is not None and df_general is not None:
 
@@ -80,16 +91,16 @@ with tab1:
 
 with tab2:
    st.title("Предсказание значений")
-   date = st.date_input(
-      "Введите дату для предсказания",
-      value="today",
-      format="YYYY-MM-DD",
-      label_visibility="visible",
-   )
 
    model = None
 
    with st.form(key="form_predict"):
+      date = st.date_input(
+         "Введите дату для предсказания",
+         value="today",
+         format="YYYY-MM-DD",
+         label_visibility="visible",
+      )
       tasks_predict = [
          "Предсказание роста клиентов",
          "Предсказание оттока клиентов",
@@ -108,6 +119,7 @@ with tab2:
          products,
          index=None,
          placeholder="Выберите продукт предсказания",
+         on_change=file_tab2,
       )
       submit_button = st.form_submit_button(label="Предсказать", type="primary")
 
@@ -152,17 +164,16 @@ with tab3:
    )
    
    df_general = None
-  
+
    if uploaded_file_general_profile and uploaded_file_general_profile.name.endswith(".xlsb"):
-      if st.session_state["files"]['df_general_profile']["file_id"] != uploaded_file_general_profile.file_id:
+      if st.session_state["files"]['df_general_profile'] is None:
          my_bar = st.progress(0, text="Обработка главного файла")
          df_general = load_file(file_path=uploaded_file_general_profile.getvalue(), header=0)
          my_bar.progress(100, text="Обработка файлов")
          my_bar.empty()
-         st.session_state["files"]['df_general_profile']["df"] = df_general
-         st.session_state["files"]['df_general_profile']["file_id"] = uploaded_file_general_profile.file_id
+         st.session_state["files"]['df_general_profile'] = df_general
       else:
-         df_general = st.session_state["files"]['df_general_profile']["df"]
+         df_general = st.session_state["files"]['df_general_profile']
 
    if df_general is not None:
       cat_columns = df_general.select_dtypes(exclude=['int64', 'float64']).columns[1:]
@@ -289,6 +300,7 @@ with tab3:
             ("Выберите профиль"),
             list(groups_feats.keys()),
             placeholder="Выберите профиль",
+            on_change=file_tab3,
          )
          submit_button = st.form_submit_button(label="Отрисовать", type="primary")
 
