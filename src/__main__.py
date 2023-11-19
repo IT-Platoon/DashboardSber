@@ -31,7 +31,7 @@ with tab1:
    )
 
    df_acquiring, df_general = None, None
-   
+   st.cache
    if uploaded_file_acquiring_dashboard and uploaded_file_acquiring_dashboard.name.endswith(".xlsb"):
       if (
          st.session_state["files"]['df_general_dashboard']["file_id"] != uploaded_file_acquiring_dashboard.file_id or
@@ -130,12 +130,16 @@ with tab2:
                elif product == products[1]:
                   model = ModelProphet('model_pr_rko.pkl', 'data_pr_rko.csv', floor=0, cap=100)
             
-            pred = model.predict(date.year, date.month, date.day)
+            df_final = model.predict(date.year, date.month, date.day)
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.set_title(f'Тестирование модели для {product}')
             ax.set_xlabel("Период")
-            ax.set_ylabel(task)
+            true = df_final.iloc[:model.old_date.shape[0]]
+            ax.plot(true.ds, true.y, "g", label="true", linewidth=2.0)
+            pred = df_final.iloc[model.old_date.shape[0]-1:]
             ax.plot(pred.ds, pred.y, "r", label="prediction", linewidth=2.0)
+
+            ax.set_ylabel(task)
             plt.xticks(rotation=30)
             st.pyplot(fig)
 
